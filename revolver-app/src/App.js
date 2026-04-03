@@ -110,14 +110,18 @@ function VinylRecord({ size = 120, spinning = false }) {
 
 function StarRating({ rating, onRate, size = 20, interactive = true }) {
   const [hover, setHover] = useState(0);
+  const handleClick = (v) => {
+    if (!interactive || !onRate) return;
+    onRate(rating === v ? 0 : v);
+  };
   return (
     <div style={{ display:"flex",gap:2,alignItems:"center" }}>
       {[1,2,3,4,5].map(star=>{
         const filled=(hover||rating)>=star, half=!filled&&(hover||rating)>=star-0.5;
         return (
           <div key={star} style={{position:"relative",cursor:interactive?"pointer":"default",width:size,height:size}} onMouseLeave={()=>interactive&&setHover(0)}>
-            <div style={{position:"absolute",left:0,top:0,width:"50%",height:"100%",zIndex:2}} onMouseEnter={()=>interactive&&setHover(star-0.5)} onClick={()=>interactive&&onRate?.(star-0.5)}/>
-            <div style={{position:"absolute",right:0,top:0,width:"50%",height:"100%",zIndex:2}} onMouseEnter={()=>interactive&&setHover(star)} onClick={()=>interactive&&onRate?.(star)}/>
+            <div style={{position:"absolute",left:0,top:0,width:"50%",height:"100%",zIndex:2}} onMouseEnter={()=>interactive&&setHover(star-0.5)} onClick={()=>handleClick(star-0.5)}/>
+            <div style={{position:"absolute",right:0,top:0,width:"50%",height:"100%",zIndex:2}} onMouseEnter={()=>interactive&&setHover(star)} onClick={()=>handleClick(star)}/>
             <svg viewBox="0 0 24 24" width={size} height={size} style={{display:"block"}}>
               <defs><linearGradient id={`h${star}${size}`}><stop offset="50%" stopColor="#e8a849"/><stop offset="50%" stopColor="#444"/></linearGradient></defs>
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={filled?"#e8a849":half?`url(#h${star}${size})`:"#444"} stroke={filled||half?"#d4943d":"#555"} strokeWidth="1"/>
@@ -148,8 +152,22 @@ function AlbumCover({ album, size = 200, style: extraStyle = {} }) {
   );
 }
 
-function AlbumModal({ album, onClose, ratings, onRate, collection, onToggleCollection }) {
+function AlbumModal({ album, onClose, ratings, onRate, collection, onToggleCollection, reviews, onReview }) {
   const r=ratings[album.id]||0, inC=collection.includes(album.id);
+  const review=reviews[album.id]||"";
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const handleRemoveConfirmed = () => {
+    onRate(album.id, 0);
+    onReview(album.id, "");
+    onToggleCollection(album.id);
+    setConfirmRemove(false);
+  };
+
+  const handleCollectionClick = () => {
+    if (inC) { setConfirmRemove(true); } else { onToggleCollection(album.id); }
+  };
+
   return (
     <div style={{position:"fixed",inset:0,zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.85)",backdropFilter:"blur(8px)",padding:20}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:"linear-gradient(180deg,#2a2018,#1a1410)",borderRadius:16,maxWidth:480,width:"100%",padding:28,border:"1px solid rgba(232,168,73,0.2)",position:"relative",boxShadow:"0 20px 60px rgba(0,0,0,0.7)"}}>
@@ -165,13 +183,34 @@ function AlbumModal({ album, onClose, ratings, onRate, collection, onToggleColle
           </div>
         </div>
         {album.description&&<p style={{fontFamily:"var(--mono)",color:"#aa9977",fontSize:12,lineHeight:1.6,margin:"0 0 16px",fontStyle:"italic"}}>"{album.description}"</p>}
-        <div style={{marginBottom:16}}>
+        <div style={{marginBottom:14}}>
           <label style={{fontFamily:"var(--mono)",color:"#887766",fontSize:10,textTransform:"uppercase",letterSpacing:2}}>Your Rating</label>
           <div style={{marginTop:6}}><StarRating rating={r} onRate={v=>onRate(album.id,v)} size={26}/></div>
         </div>
-        <button onClick={()=>onToggleCollection(album.id)} style={{width:"100%",padding:"11px 0",borderRadius:8,background:inC?"rgba(199,84,58,0.2)":"rgba(232,168,73,0.12)",border:`1px solid ${inC?"#c7543a":"rgba(232,168,73,0.3)"}`,color:inC?"#c7543a":"#e8a849",fontFamily:"var(--mono)",fontSize:13,cursor:"pointer"}}>
-          {inC?"✓ In Collection — Remove?":"+ Add to Collection"}
-        </button>
+        <div style={{marginBottom:16}}>
+          <label style={{fontFamily:"var(--mono)",color:"#887766",fontSize:10,textTransform:"uppercase",letterSpacing:2,display:"block",marginBottom:6}}>Your Review</label>
+          <textarea
+            value={review}
+            onChange={e=>onReview(album.id,e.target.value)}
+            placeholder="Write your thoughts on this album..."
+            rows={3}
+            style={{width:"100%",padding:"9px 11px",borderRadius:8,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(232,168,73,0.15)",color:"#f0e6d3",fontFamily:"var(--mono)",fontSize:12,outline:"none",resize:"vertical",lineHeight:1.6,boxSizing:"border-box"}}
+          />
+        </div>
+
+        {confirmRemove ? (
+          <div style={{borderRadius:8,background:"rgba(199,84,58,0.1)",border:"1px solid rgba(199,84,58,0.3)",padding:"14px 16px"}}>
+            <p style={{fontFamily:"var(--mono)",color:"#f0e6d3",fontSize:12,marginBottom:12,lineHeight:1.5}}>Remove from collection? Your rating and review will also be deleted.</p>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={handleRemoveConfirmed} style={{flex:1,padding:"9px 0",borderRadius:7,background:"rgba(199,84,58,0.25)",border:"1px solid #c7543a",color:"#c7543a",fontFamily:"var(--mono)",fontSize:12,cursor:"pointer"}}>Yes, Remove</button>
+              <button onClick={()=>setConfirmRemove(false)} style={{flex:1,padding:"9px 0",borderRadius:7,background:"rgba(232,168,73,0.08)",border:"1px solid rgba(232,168,73,0.2)",color:"#e8a849",fontFamily:"var(--mono)",fontSize:12,cursor:"pointer"}}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={handleCollectionClick} style={{width:"100%",padding:"11px 0",borderRadius:8,background:inC?"rgba(199,84,58,0.2)":"rgba(232,168,73,0.12)",border:`1px solid ${inC?"#c7543a":"rgba(232,168,73,0.3)"}`,color:inC?"#c7543a":"#e8a849",fontFamily:"var(--mono)",fontSize:13,cursor:"pointer"}}>
+            {inC?"✓ In Collection — Remove?":"+ Add to Collection"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -337,6 +376,7 @@ function ProfilePanel({ onClose, profile, setProfile, connectedServices, toggleS
 export default function App() {
   const [tab, setTab] = useState("browse");
   const [ratings, setRatings] = useState({});
+  const [reviews, setReviews] = useState({});
   const [collection, setCollection] = useState([]);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -357,6 +397,7 @@ export default function App() {
   useEffect(()=>{
     async function load(){
       try{const r=await storage.get("rev-ratings");if(r?.value)setRatings(JSON.parse(r.value));}catch{}
+      try{const rv=await storage.get("rev-reviews");if(rv?.value)setReviews(JSON.parse(rv.value));}catch{}
       try{const c=await storage.get("rev-collection");if(c?.value)setCollection(JSON.parse(c.value));}catch{}
       try{const s=await storage.get("rev-services");if(s?.value)setConnectedServices(JSON.parse(s.value));}catch{}
       try{const t=await storage.get("rev-top-songs");if(t?.value)setTopSongs(JSON.parse(t.value));}catch{}
@@ -367,7 +408,8 @@ export default function App() {
     load();
   },[]);
 
-  const handleRate=useCallback((id,r)=>{setRatings(p=>{const n={...p,[id]:r};sv("rev-ratings",n);return n;});},[]);
+  const handleRate=useCallback((id,r)=>{setRatings(p=>{const n={...p,[id]:r};if(r===0){const m={...n};delete m[id];sv("rev-ratings",m);return m;}sv("rev-ratings",n);return n;});},[]);
+  const handleReview=useCallback((id,text)=>{setReviews(p=>{const n={...p,[id]:text};if(!text){const m={...n};delete m[id];sv("rev-reviews",m);return m;}sv("rev-reviews",n);return n;});},[]);
   const handleToggleCollection=useCallback(id=>{setCollection(p=>{const n=p.includes(id)?p.filter(i=>i!==id):[...p,id];sv("rev-collection",n);return n;});},[]);
   const toggleService=id=>{setConnectedServices(p=>{const n={...p,[id]:!p[id]};sv("rev-services",n);return n;});};
 
@@ -613,7 +655,7 @@ export default function App() {
         )}
       </main>
 
-      {selectedAlbum&&<AlbumModal album={selectedAlbum} onClose={()=>setSelectedAlbum(null)} ratings={ratings} onRate={handleRate} collection={collection} onToggleCollection={handleToggleCollection}/>}
+      {selectedAlbum&&<AlbumModal album={selectedAlbum} onClose={()=>setSelectedAlbum(null)} ratings={ratings} onRate={handleRate} collection={collection} onToggleCollection={handleToggleCollection} reviews={reviews} onReview={handleReview}/>}
       {pickerOpen&&<Top4Picker type={pickerOpen} current={pickerOpen==="songs"?topSongs:topAlbums} allAlbums={allAlbums} onSave={items=>{if(pickerOpen==="songs"){setTopSongs(items);sv("rev-top-songs",items);}else{setTopAlbums(items);sv("rev-top-albums",items);}}} onClose={()=>setPickerOpen(null)}/>}
       {profileOpen&&<ProfilePanel onClose={()=>setProfileOpen(false)} profile={profile} setProfile={setProfile} connectedServices={connectedServices} toggleService={toggleService} topSongs={topSongs} topAlbums={topAlbums} setPickerOpen={setPickerOpen} save={sv}/>}
 

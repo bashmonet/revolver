@@ -2,21 +2,21 @@
 
 @font-face {
   font-family: 'Milestone';
-  src: url('/fonts/MilestoneFreeVersion-Script.otf') format('opentype');
+  src: url('../public/fonts/MilestoneFreeVersion-Script.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'MilkyVintage';
-  src: url('/fonts/MilkyVintage-Regular.ttf') format('truetype');
+  src: url('../public/fonts/MilkyVintage-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Bellerose';
-  src: url('/fonts/Bellerose.ttf') format('truetype');
+  src: url('../public/fonts/Bellerose.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
