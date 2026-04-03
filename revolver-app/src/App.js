@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import './fonts.css';
+import { searchAlbums, getNewReleases } from './spotify';
 
 // ═══════════════════════════════════════════════
 //  Simple localStorage wrapper (replaces window.storage for local dev)
@@ -141,9 +142,9 @@ function AlbumCover({ album, size = 200, style: extraStyle = {} }) {
   return (
     <div style={{width:size,height:size,borderRadius:4,overflow:"hidden",background:C[ci],position:"relative",boxShadow:"0 4px 20px rgba(0,0,0,0.5)",...extraStyle}}>
       {!err&&album.cover?(
-        <img src={album.cover} alt={album.title} style={{width:"100%",height:"100%",objectFit:"cover"}} onError={()=>setErr(true)}/>
+        <img src={album.cover} alt={album.title} style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",objectFit:"cover"}} onError={()=>setErr(true)}/>
       ):(
-        <div style={{width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:10,background:`linear-gradient(135deg,${C[ci]},${C[(ci+2)%C.length]})`}}>
+        <div style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:10,background:`linear-gradient(135deg,${C[ci]},${C[(ci+2)%C.length]})`}}>
           <div style={{fontSize:typeof size==="number"?size*0.14:16,fontWeight:700,color:"#fff",textAlign:"center",lineHeight:1.2,fontFamily:"var(--disp)"}}>{album.title}</div>
           <div style={{fontSize:typeof size==="number"?size*0.07:9,color:"rgba(255,255,255,0.7)",marginTop:3,fontFamily:"var(--mono)"}}>{album.artist}</div>
         </div>
@@ -413,6 +414,11 @@ export default function App() {
   const handleToggleCollection=useCallback(id=>{setCollection(p=>{const n=p.includes(id)?p.filter(i=>i!==id):[...p,id];sv("rev-collection",n);return n;});},[]);
   const toggleService=id=>{setConnectedServices(p=>{const n={...p,[id]:!p[id]};sv("rev-services",n);return n;});};
 
+  const [newReleases, setNewReleases] = useState([]);
+  useEffect(()=>{
+    getNewReleases().then(setNewReleases).catch(()=>{});
+  },[]);
+
   const handleSearch=useCallback(q=>{
     setSearchQuery(q);
     if(searchTimeout.current)clearTimeout(searchTimeout.current);
@@ -420,19 +426,14 @@ export default function App() {
     searchTimeout.current=setTimeout(async()=>{
       setSearching(true);
       try{
-        const resp=await fetch(`https://musicbrainz.org/ws/2/release-group?query=${encodeURIComponent(q)}&type=album&limit=12&fmt=json`,{headers:{Accept:"application/json"}});
-        const data=await resp.json();
-        setSearchResults((data["release-groups"]||[]).map(rg=>({
-          id:`mb-${rg.id}`,title:rg.title,artist:rg["artist-credit"]?.[0]?.name||"Unknown",
-          year:rg["first-release-date"]?.substring(0,4)||"—",genre:rg.tags?.[0]?.name||"Album",
-          cover:`https://coverartarchive.org/release-group/${rg.id}/front-250`,
-        })));
+        const results=await searchAlbums(q);
+        setSearchResults(results);
       }catch{setSearchResults([]);}
       setSearching(false);
-    },500);
+    },400);
   },[]);
 
-  const allAlbums=[...SAMPLE_ALBUMS,...LOCAL_RELEASES];
+  const allAlbums=[...newReleases,...SAMPLE_ALBUMS,...LOCAL_RELEASES];
   const collectionAlbums=allAlbums.filter(a=>collection.includes(a.id));
 
   const tabs=[
@@ -499,9 +500,10 @@ export default function App() {
                   <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:13,opacity:0.4}}>🔍</span>
                   {searching&&<span style={{position:"absolute",right:11,top:"50%",transform:"translateY(-50%)"}}><VinylRecord size={15} spinning/></span>}
                 </div>
-                {searchResults&&<p style={{color:"#887766",fontSize:9,marginBottom:10,textTransform:"uppercase",letterSpacing:1.5}}>{searchResults.length} results from MusicBrainz</p>}
+                {searchResults&&<p style={{color:"#887766",fontSize:9,marginBottom:10,textTransform:"uppercase",letterSpacing:1.5}}>{searchResults.length} results from Spotify</p>}
+                {!searchResults&&newReleases.length===0&&<p style={{color:"#554433",fontSize:10,marginBottom:10,textTransform:"uppercase",letterSpacing:1.5}}>Loading new releases...</p>}
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:12}}>
-                  {(searchResults||SAMPLE_ALBUMS).map((album,i)=>(
+                  {(searchResults||(newReleases.length>0?newReleases:SAMPLE_ALBUMS)).map((album,i)=>(
                     <div key={album.id} onClick={()=>setSelectedAlbum(album)} style={{cursor:"pointer",animation:`slideUp 0.4s ease ${i*0.03}s both`,transition:"transform 0.2s"}}
                       onMouseEnter={e=>e.currentTarget.style.transform="translateY(-3px)"} onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
                       <AlbumCover album={album} size="100%" style={{width:"100%",height:0,paddingBottom:"100%"}}/>
